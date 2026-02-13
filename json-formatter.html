@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Formatter - From Entropy to Indentation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Light Theme (Default) */
+            --primary: #ea580c;
+            /* Dark Orange */
+            --primary-dark: #c2410c;
+            --primary-light: #fb923c;
+            --bg: #e0e5ec;
+            --text: #2d3748;
+            --text-light: #64748b;
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --shadow-light: #ffffff;
+            --shadow-dark: #a3b1c6;
+        }
+
+        [data-theme="dark"] {
+            --primary: #ea580c;
+            /* Dark Orange stays consistent */
+            --primary-dark: #c2410c;
+            --primary-light: #fb923c;
+            --bg: #1a202c;
+            /* Dark Background */
+            --text: #e2e8f0;
+            --text-light: #a0aec0;
+            --shadow-light: #2d3748;
+            /* Lighter dark for shadow */
+            --shadow-dark: #0f131a;
+            /* Darker dark for shadow */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 2rem 1rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+            flex: 1;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .subtitle {
+            color: var(--text-light);
+            font-size: 1.1rem;
+        }
+
+        /* Theme Toggle - Screw Fitted Style */
+        .theme-toggle {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: var(--bg);
+            border: none;
+            cursor: pointer;
+            padding: 1rem 1.5rem;
+            /* Top-right matches container (20px), Bottom-left rounded for style */
+            border-radius: 0 20px 0 20px;
+            color: var(--text);
+            font-size: 1.5rem;
+            box-shadow:
+                inset 2px 2px 5px var(--shadow-dark),
+                inset -2px -2px 5px var(--shadow-light);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            border-left: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .theme-toggle:hover {
+            color: var(--primary);
+            box-shadow:
+                inset 1px 1px 3px var(--shadow-dark),
+                inset -1px -1px 3px var(--shadow-light);
+        }
+
+        .theme-toggle:active {
+            box-shadow:
+                inset 3px 3px 6px var(--shadow-dark),
+                inset -3px -3px 6px var(--shadow-light);
+            transform: scale(0.95);
+        }
+
+        /* Neumorphic Card */
+        .card {
+            position: relative;
+            /* Contain the absolute button */
+            background: var(--bg);
+            border-radius: 20px;
+            padding: 2rem;
+            padding-top: 2.5rem;
+            /* Reduced padding */
+            box-shadow:
+                8px 8px 16px var(--shadow-dark),
+                -8px -8px 16px var(--shadow-light);
+            margin-bottom: 2rem;
+        }
+
+        /* Controls Section */
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            /* Reduced gap */
+            margin-bottom: 2rem;
+            align-items: center;
+            padding-right: 60px;
+            /* Prevent overlap with theme toggle */
+        }
+
+        /* Width Control Slider */
+        .width-control {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            /* Reduced gap inside control */
+            padding: 0.5rem 1rem;
+            /* Reduced padding */
+            background: var(--bg);
+            border-radius: 12px;
+            box-shadow:
+                inset 3px 3px 6px var(--shadow-dark),
+                inset -3px -3px 6px var(--shadow-light);
+        }
+
+        .width-control label {
+            font-size: 0.85rem;
+            /* Slightly smaller */
+            font-weight: 600;
+            color: var(--text);
+            white-space: nowrap;
+        }
+
+        .width-slider {
+            width: 120px;
+            /* Slightly smaller slider */
+            height: 6px;
+            border-radius: 3px;
+            background: var(--bg);
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            box-shadow:
+                inset 2px 2px 4px var(--shadow-dark),
+                inset -2px -2px 4px var(--shadow-light);
+        }
+
+        .width-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            /* Smaller thumb */
+            height: 16px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, var(--primary-light), var(--primary));
+            cursor: pointer;
+            box-shadow:
+                2px 2px 4px var(--shadow-dark),
+                -2px -2px 4px var(--shadow-light);
+        }
+
+        .width-slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, var(--primary-light), var(--primary));
+            cursor: pointer;
+            border: none;
+            box-shadow:
+                2px 2px 4px var(--shadow-dark),
+                -2px -2px 4px var(--shadow-light);
+        }
+
+        .width-value {
+            font-size: 0.85rem;
+            color: var(--primary);
+            font-weight: 700;
+            min-width: 40px;
+        }
+
+        /* Neumorphic Button */
+        .btn {
+            padding: 0.6rem 1rem;
+            /* Compact padding */
+            border: none;
+            border-radius: 10px;
+            /* Slightly smaller radius */
+            font-size: 0.9rem;
+            /* Smaller font */
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--bg);
+            color: var(--text);
+            box-shadow:
+                3px 3px 6px var(--shadow-dark),
+                /* Reduced shadow size */
+                -3px -3px 6px var(--shadow-light);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .btn:hover {
+            box-shadow:
+                2px 2px 4px var(--shadow-dark),
+                -2px -2px 4px var(--shadow-light);
+        }
+
+        .btn:active {
+            box-shadow:
+                inset 2px 2px 4px var(--shadow-dark),
+                inset -2px -2px 4px var(--shadow-light);
+        }
+
+        .btn-primary {
+            background: linear-gradient(145deg, var(--primary-light), var(--primary));
+            color: white;
+            box-shadow:
+                5px 5px 10px var(--shadow-dark),
+                -5px -5px 10px var(--shadow-light),
+                inset 0 0 0 rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(145deg, var(--primary), var(--primary-dark));
+        }
+
+        .btn-success {
+            background: linear-gradient(145deg, #34d399, var(--success));
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(145deg, #fbbf24, var(--warning));
+            color: white;
+        }
+
+        /* Input/Output Section - Fixed Width Management */
+        .editor-container {
+            display: flex;
+            gap: 0;
+            /* Removed gap to allow resizer to sit flush */
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .resizer {
+            background-color: transparent;
+            cursor: col-resize;
+            width: 10px;
+            margin: 0 10px;
+            border-radius: 5px;
+            transition: background-color 0.2s;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .resizer:hover,
+        .resizer.resizing {
+            background-color: var(--primary-light);
+        }
+
+        .resizer::after {
+            content: "||";
+            color: var(--text-light);
+            font-size: 10px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .resizer:hover::after,
+        .resizer.resizing::after {
+            opacity: 1;
+        }
+
+        .editor-wrapper {
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            min-width: 300px;
+        }
+
+        .editor-wrapper.input-wrapper {
+            flex-basis: 50%;
+        }
+
+        .editor-wrapper.output-wrapper {
+            flex-basis: 50%;
+        }
+
+        .editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .editor-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .char-count {
+            font-size: 0.875rem;
+            color: var(--text-light);
+            background: var(--bg);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            box-shadow:
+                inset 2px 2px 4px var(--shadow-dark),
+                inset -2px -2px 4px var(--shadow-light);
+        }
+
+        /* Neumorphic Textarea */
+        textarea {
+            width: 100%;
+            min-height: 400px;
+            padding: 1.5rem;
+            border: none;
+            border-radius: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            resize: vertical;
+            background: var(--bg);
+            color: var(--text);
+            box-shadow:
+                inset 6px 6px 12px var(--shadow-dark),
+                inset -6px -6px 12px var(--shadow-light);
+            transition: all 0.3s ease;
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--primary-light);
+            border-radius: 6px;
+            border: 3px solid var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+
+        textarea:focus {
+            outline: none;
+            box-shadow:
+                inset 4px 4px 8px var(--shadow-dark),
+                inset -4px -4px 8px var(--shadow-light),
+                0 0 0 2px var(--primary-light);
+        }
+
+        /* JSON Viewer with Syntax Highlighting and Better Tree */
+        .json-viewer {
+            width: 100%;
+            min-height: 400px;
+            /* max-height: 600px;  Removed to allow resizing */
+            padding: 1.5rem;
+            border-radius: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            line-height: 1.8;
+            background: var(--bg);
+            color: var(--text);
+            box-shadow:
+                inset 6px 6px 12px var(--shadow-dark),
+                inset -6px -6px 12px var(--shadow-light);
+            overflow: auto;
+            /* Changed to auto for both directions */
+            white-space: pre;
+            resize: vertical;
+            /* Enable vertical resizing */
+        }
+
+        /* Improved Tree Structure */
+        .json-line {
+            display: block;
+            position: relative;
+            padding-left: 0;
+        }
+
+        .json-indent {
+            display: inline-block;
+            width: 1.5em;
+        }
+
+        /* Syntax Highlighting Colors - Updated for Dark Mode Compatibility */
+        .json-key {
+            color: #ef4444;
+            /* Red-500 */
+        }
+
+        [data-theme="dark"] .json-key {
+            color: #f87171;
+            /* Red-400 */
+        }
+
+        .json-string {
+            color: #10b981;
+            /* Emerald-500 */
+        }
+
+        [data-theme="dark"] .json-string {
+            color: #34d399;
+            /* Emerald-400 */
+        }
+
+        .json-number {
+            color: #3b82f6;
+            /* Blue-500 */
+            font-weight: 600;
+        }
+
+        [data-theme="dark"] .json-number {
+            color: #60a5fa;
+            /* Blue-400 */
+        }
+
+        .json-boolean {
+            color: #ea580c;
+            /* Orange-600 (Primary) */
+            font-weight: 600;
+        }
+
+        [data-theme="dark"] .json-boolean {
+            color: #fb923c;
+            /* Orange-400 */
+        }
+
+        .json-null {
+            color: #8b5cf6;
+            /* Violet-500 */
+            font-weight: 600;
+        }
+
+        [data-theme="dark"] .json-null {
+            color: #a78bfa;
+            /* Violet-400 */
+        }
+
+        .json-bracket {
+            color: var(--text);
+            font-weight: bold;
+        }
+
+        /* Collapsible Toggle Button */
+        .json-toggle {
+            cursor: pointer;
+            user-select: none;
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            line-height: 16px;
+            text-align: center;
+            background: linear-gradient(145deg, var(--primary-light), var(--primary));
+            color: white;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 14px;
+            margin-right: 6px;
+            transition: all 0.2s ease;
+            box-shadow:
+                2px 2px 4px var(--shadow-dark),
+                -1px -1px 2px var(--shadow-light);
+        }
+
+        .json-toggle:hover {
+            background: linear-gradient(145deg, var(--primary), var(--primary-dark));
+            transform: scale(1.1);
+        }
+
+        .json-toggle.collapsed {
+            background: linear-gradient(145deg, #94a3b8, #64748b);
+        }
+
+        .json-ellipsis {
+            color: var(--text-light);
+            font-style: italic;
+            margin: 0 4px;
+        }
+
+        /* Indent Controls */
+        .indent-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .indent-label {
+            font-size: 0.9rem;
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .indent-btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: var(--bg);
+            color: var(--text);
+            box-shadow:
+                3px 3px 6px var(--shadow-dark),
+                -3px -3px 6px var(--shadow-light);
+            transition: all 0.2s ease;
+        }
+
+        .indent-btn:hover {
+            box-shadow:
+                2px 2px 4px var(--shadow-dark),
+                -2px -2px 4px var(--shadow-light);
+        }
+
+        .indent-btn.active {
+            background: linear-gradient(145deg, var(--primary-light), var(--primary));
+            color: white;
+            box-shadow:
+                inset 2px 2px 4px var(--shadow-dark),
+                inset -2px -2px 4px var(--shadow-light);
+        }
+
+        /* Status Message */
+        .status-container {
+            margin-top: 1rem;
+            min-height: 50px;
+        }
+
+        .status-message {
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            animation: slideIn 0.3s ease;
+            box-shadow:
+                4px 4px 8px var(--shadow-dark),
+                -4px -4px 8px var(--shadow-light);
+        }
+
+        .status-success {
+            background: linear-gradient(145deg, #6ee7b7, var(--success));
+            color: white;
+        }
+
+        .status-error {
+            background: linear-gradient(145deg, #fca5a5, var(--error));
+            color: white;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Gen Z Footer */
+        footer {
+            background: var(--bg);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-top: 3rem;
+            text-align: center;
+            box-shadow:
+                8px 8px 16px var(--shadow-dark),
+                -8px -8px 16px var(--shadow-light);
+        }
+
+        .footer-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .footer-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), #ec4899, #f59e0b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            animation: gradientShift 3s ease infinite;
+        }
+
+        @keyframes gradientShift {
+
+            0%,
+            100% {
+                filter: hue-rotate(0deg);
+            }
+
+            50% {
+                filter: hue-rotate(20deg);
+            }
+        }
+
+        .footer-text {
+            color: var(--text-light);
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            line-height: 1.6;
+        }
+
+        .footer-emoji {
+            font-size: 1.5rem;
+            margin: 0.5rem 0;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .footer-emoji span {
+            animation: bounce 2s ease-in-out infinite;
+            display: inline-block;
+        }
+
+        .footer-emoji span:nth-child(1) {
+            animation-delay: 0s;
+        }
+
+        .footer-emoji span:nth-child(2) {
+            animation-delay: 0.1s;
+        }
+
+        .footer-emoji span:nth-child(3) {
+            animation-delay: 0.2s;
+        }
+
+        .footer-emoji span:nth-child(4) {
+            animation-delay: 0.3s;
+        }
+
+        .footer-emoji span:nth-child(5) {
+            animation-delay: 0.4s;
+        }
+
+        .footer-emoji span:nth-child(6) {
+            animation-delay: 0.5s;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        .footer-credits {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 2px solid rgba(99, 102, 241, 0.2);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 968px) {
+            .editor-container {
+                flex-direction: column;
+            }
+
+            .editor-wrapper.input-wrapper,
+            .editor-wrapper.output-wrapper {
+                flex-basis: auto;
+                width: 100%;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .controls {
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 1rem 0.5rem;
+            }
+
+            .card {
+                padding: 1.5rem;
+                border-radius: 15px;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .subtitle {
+                font-size: 1rem;
+            }
+
+            .btn {
+                padding: 0.75rem 1.25rem;
+                font-size: 0.9rem;
+            }
+
+            textarea,
+            .json-viewer {
+                min-height: 300px;
+                font-size: 0.85rem;
+            }
+
+            .footer-title {
+                font-size: 1.25rem;
+            }
+
+            .footer-text {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+        <div class="container">
+            <!-- Main Card -->
+            <div class="card">
+                <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle Dark Mode">
+                    <span>🌙</span>
+                </button>
+
+                <!-- Controls -->
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="formatJSON()">
+                        <span>🎨</span> Format JSON
+                    </button>
+                    <button class="btn btn-success" onclick="validateJSON()">
+                        <span>✓</span> Validate
+                    </button>
+                    <button class="btn" onclick="minifyJSON()">
+                        <span>🗜️</span> Minify
+                    </button>
+                    <button class="btn" onclick="copyOutput()">
+                        <span>📋</span> Copy
+                    </button>
+                    <button class="btn btn-warning" onclick="clearAll()">
+                        <span>🗑️</span> Clear
+                    </button>
+                    <button class="btn" onclick="expandAll()">
+                        <span>📂</span> Expand All
+                    </button>
+                    <button class="btn" onclick="collapseAll()">
+                        <span>📁</span> Collapse All
+                    </button>
+                </div>
+
+                <!-- Indentation & Width Controls -->
+                <div class="controls">
+                    <div class="indent-controls">
+                        <span class="indent-label">Indent:</span>
+                        <button class="indent-btn active" onclick="setIndent(2)">2 spaces</button>
+                        <button class="indent-btn" onclick="setIndent(4)">4 spaces</button>
+                        <button class="indent-btn" onclick="setIndent(8)">8 spaces</button>
+                    </div>
+
+                    <div class="width-control">
+                        <label for="widthSlider">Panel Width:</label>
+                        <input type="range" id="widthSlider" class="width-slider" min="30" max="70" value="50"
+                            oninput="adjustPanelWidth(this.value)">
+                        <span class="width-value" id="widthValue">50%</span>
+                    </div>
+                </div>
+
+                <!-- Input/Output Editors -->
+                <div class="editor-container" id="editorContainer">
+                    <div class="editor-wrapper input-wrapper" id="inputWrapper">
+                        <div class="editor-header">
+                            <span class="editor-title">📝 Input JSON</span>
+                            <span class="char-count" id="inputCount">0 characters</span>
+                        </div>
+                        <textarea id="inputJSON" placeholder="Paste your JSON here..."></textarea>
+                    </div>
+
+                    <div class="resizer" id="dragMe"></div>
+
+                    <div class="editor-wrapper output-wrapper" id="outputWrapper">
+                        <div class="editor-header">
+                            <span class="editor-title">✨ Formatted Output</span>
+                            <span class="char-count" id="outputCount">0 characters</span>
+                        </div>
+                        <div class="json-viewer" id="outputJSON">Formatted JSON will appear here...</div>
+                        <textarea id="outputJSONRaw" style="display: none;"></textarea>
+                    </div>
+                </div>
+
+                <!-- Status Message -->
+                <div class="status-container">
+                    <div id="statusMessage"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Funky Gen Z Footer -->
+        <footer>
+            <div class="footer-content">
+                <div class="footer-title"> from Entropy to Indentation</div>
+
+                <div class="footer-emoji">
+                    <span>✨</span>
+                    <span>🔥</span>
+                    <span>💯</span>
+                    <span>🚀</span>
+                    <span>💫</span>
+                    <span>🎯</span>
+                </div>
+                <div class="footer-credits">
+                    made with vibes and chaos • keyboard shortcuts: Ctrl+Enter to format • Ctrl+M to minify • Ctrl+K to
+                    clear
+                </div>
+            </div>
+        </footer>
+
+        <script>
+            const inputJSON = document.getElementById('inputJSON');
+            const outputJSON = document.getElementById('outputJSON');
+            const outputJSONRaw = document.getElementById('outputJSONRaw');
+            const inputCount = document.getElementById('inputCount');
+            const outputCount = document.getElementById('outputCount');
+            let currentIndent = 2;
+            let collapseId = 0;
+
+            // Theme Management
+            function initTheme() {
+                const savedTheme = localStorage.getItem('theme');
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+                if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+                    applyTheme('dark');
+                } else {
+                    applyTheme('light');
+                }
+            }
+
+            function toggleTheme() {
+                const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                applyTheme(newTheme);
+            }
+
+            function applyTheme(theme) {
+                document.documentElement.setAttribute('data-theme', theme);
+                localStorage.setItem('theme', theme);
+
+                const btn = document.getElementById('themeToggle');
+                const span = btn.querySelector('span');
+
+                if (theme === 'dark') {
+                    span.textContent = '☀️';
+                    btn.setAttribute('aria-label', 'Switch to Light Mode');
+                } else {
+                    span.textContent = '🌙';
+                    btn.setAttribute('aria-label', 'Switch to Dark Mode');
+                }
+            }
+
+            // Initialize Theme
+            initTheme();
+
+            // Character counter
+            inputJSON.addEventListener('input', () => {
+                updateCharCount(inputJSON, inputCount);
+            });
+
+            function updateCharCount(textarea, countElement) {
+                const length = textarea.value.length;
+                countElement.textContent = `${length.toLocaleString()} character${length !== 1 ? 's' : ''}`;
+            }
+
+            function updateOutputCharCount(text) {
+                const length = text.length;
+                outputCount.textContent = `${length.toLocaleString()} character${length !== 1 ? 's' : ''}`;
+            }
+
+            // Status message system
+            function showStatus(message, type = 'success') {
+                const statusDiv = document.getElementById('statusMessage');
+                statusDiv.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+
+                setTimeout(() => {
+                    statusDiv.innerHTML = '';
+                }, 5000);
+            }
+
+            // Panel Width Adjustment & Resizing
+            const resizer = document.getElementById('dragMe');
+            const container = document.getElementById('editorContainer');
+            const leftSide = document.getElementById('inputWrapper');
+            const rightSide = document.getElementById('outputWrapper');
+            const widthSlider = document.getElementById('widthSlider');
+            const widthValue = document.getElementById('widthValue');
+
+            // Initialize width from slider
+            adjustPanelWidth(widthSlider.value);
+
+            function adjustPanelWidth(value) {
+                // Ensure value is within bounds (min 20%, max 80%)
+                // The slider limits are 30-70, but drag can go a bit further if desired, 
+                // but let's stick to slider limits for consistency or clamp it.
+                value = Math.max(30, Math.min(70, value));
+
+                // Subtract half the resizer width (15px) from each side to prevent overlap
+                // Resizer is 10px width + 20px margin = 30px total
+                leftSide.style.flexBasis = `calc(${value}% - 15px)`;
+                rightSide.style.flexBasis = `calc(${100 - value}% - 15px)`;
+
+                widthValue.textContent = `${Math.round(value)}%`;
+                widthSlider.value = value;
+            }
+
+            // Mouse Drag Logic
+            let x = 0;
+            let leftWidth = 0;
+            let isResizing = false;
+
+            const mouseDownHandler = function (e) {
+                // Get the current mouse position
+                x = e.clientX;
+                leftWidth = leftSide.getBoundingClientRect().width;
+
+                isResizing = true;
+                resizer.classList.add('resizing');
+                document.body.style.cursor = 'col-resize';
+
+                // Attach the listeners to `document`
+                document.addEventListener('mousemove', mouseMoveHandler);
+                document.addEventListener('mouseup', mouseUpHandler);
+            };
+
+            const mouseMoveHandler = function (e) {
+                const dx = e.clientX - x;
+                const containerWidth = container.getBoundingClientRect().width;
+
+                const newLeftWidth = leftWidth + dx;
+                let newWidthPercent = (newLeftWidth / containerWidth) * 100;
+
+                // Clamp between 30% and 70% to match slider
+                newWidthPercent = Math.max(30, Math.min(70, newWidthPercent));
+
+                adjustPanelWidth(newWidthPercent);
+            };
+
+            const mouseUpHandler = function () {
+                isResizing = false;
+                resizer.classList.remove('resizing');
+                document.body.style.removeProperty('cursor');
+
+                document.removeEventListener('mousemove', mouseMoveHandler);
+                document.removeEventListener('mouseup', mouseUpHandler);
+            };
+
+            resizer.addEventListener('mousedown', mouseDownHandler);
+
+            // Syntax highlighting for non-collapsible JSON (minified)
+            function syntaxHighlight(json) {
+                json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                    let cls = 'json-number';
+                    if (/^"/.test(match)) {
+                        if (/:$/.test(match)) {
+                            cls = 'json-key';
+                        } else {
+                            cls = 'json-string';
+                        }
+                    } else if (/true|false/.test(match)) {
+                        cls = 'json-boolean';
+                    } else if (/null/.test(match)) {
+                        cls = 'json-null';
+                    }
+                    return '<span class="' + cls + '">' + match + '</span>';
+                });
+            }
+
+            // Create collapsible, syntax-highlighted JSON with proper tree structure
+            function createCollapsibleJSON(obj, indent = 0) {
+                let html = '';
+                const indentStr = '  '.repeat(indent);
+
+                if (Array.isArray(obj)) {
+                    if (obj.length === 0) {
+                        html += '<span class="json-bracket">[]</span>';
+                    } else {
+                        const currentId = collapseId++;
+                        html += `<span class="json-toggle" id="toggle_${currentId}" onclick="toggleCollapse(${currentId})">−</span>`;
+                        html += '<span class="json-bracket">[</span>';
+                        html += `<span class="json-ellipsis" id="ellipsis_${currentId}" style="display: none;">...</span>`;
+                        html += `<span id="content_${currentId}">`;
+
+                        obj.forEach((item, index) => {
+                            html += '\n' + indentStr + '  ';
+                            html += createCollapsibleJSON(item, indent + 1);
+                            if (index < obj.length - 1) {
+                                html += ',';
+                            }
+                        });
+
+                        html += '\n' + indentStr;
+                        html += '</span>';
+                        html += `<span class="json-bracket" id="bracket_${currentId}">]</span>`;
+                    }
+                } else if (typeof obj === 'object' && obj !== null) {
+                    const keys = Object.keys(obj);
+                    if (keys.length === 0) {
+                        html += '<span class="json-bracket">{}</span>';
+                    } else {
+                        const currentId = collapseId++;
+                        html += `<span class="json-toggle" id="toggle_${currentId}" onclick="toggleCollapse(${currentId})">−</span>`;
+                        html += '<span class="json-bracket">{</span>';
+                        html += `<span class="json-ellipsis" id="ellipsis_${currentId}" style="display: none;">...</span>`;
+                        html += `<span id="content_${currentId}">`;
+
+                        keys.forEach((key, index) => {
+                            html += '\n' + indentStr + '  ';
+                            html += `<span class="json-key">"${key}"</span>: `;
+                            html += createCollapsibleJSON(obj[key], indent + 1);
+                            if (index < keys.length - 1) {
+                                html += ',';
+                            }
+                        });
+
+                        html += '\n' + indentStr;
+                        html += '</span>';
+                        html += `<span class="json-bracket" id="bracket_${currentId}">}</span>`;
+                    }
+                } else if (typeof obj === 'string') {
+                    html += `<span class="json-string">"${obj}"</span>`;
+                } else if (typeof obj === 'number') {
+                    html += `<span class="json-number">${obj}</span>`;
+                } else if (typeof obj === 'boolean') {
+                    html += `<span class="json-boolean">${obj}</span>`;
+                } else if (obj === null) {
+                    html += `<span class="json-null">null</span>`;
+                }
+
+                return html;
+            }
+
+            // Toggle collapse/expand
+            function toggleCollapse(id) {
+                const content = document.getElementById('content_' + id);
+                const toggle = document.getElementById('toggle_' + id);
+                const ellipsis = document.getElementById('ellipsis_' + id);
+                const bracket = document.getElementById('bracket_' + id);
+
+                if (content.style.display === 'none') {
+                    content.style.display = 'inline';
+                    toggle.textContent = '−';
+                    toggle.classList.remove('collapsed');
+                    ellipsis.style.display = 'none';
+                    bracket.style.display = 'inline';
+                } else {
+                    content.style.display = 'none';
+                    toggle.textContent = '+';
+                    toggle.classList.add('collapsed');
+                    ellipsis.style.display = 'inline';
+                    bracket.style.display = 'none';
+                }
+            }
+
+            function formatJSON() {
+                const input = inputJSON.value.trim();
+
+                if (!input) {
+                    showStatus('Please enter some JSON to format', 'error');
+                    return;
+                }
+
+                try {
+                    const parsed = JSON.parse(input);
+                    const formatted = JSON.stringify(parsed, null, currentIndent);
+                    outputJSONRaw.value = formatted;
+
+                    // Reset collapse ID counter
+                    collapseId = 0;
+
+                    // Create collapsible, syntax-highlighted version
+                    const html = createCollapsibleJSON(parsed);
+                    outputJSON.innerHTML = html;
+
+                    updateOutputCharCount(formatted);
+                    showStatus('JSON formatted successfully! ✨ Click − to collapse arrays/objects', 'success');
+                } catch (error) {
+                    showStatus(`Invalid JSON: ${error.message}`, 'error');
+                    outputJSON.innerHTML = '<span style="color: var(--error);">Invalid JSON</span>';
+                    outputJSONRaw.value = '';
+                    updateOutputCharCount('');
+                }
+            }
+
+            function validateJSON() {
+                const input = inputJSON.value.trim();
+
+                if (!input) {
+                    showStatus('Please enter some JSON to validate', 'error');
+                    return;
+                }
+
+                try {
+                    JSON.parse(input);
+                    showStatus('Valid JSON! ✓ Your JSON is properly structured.', 'success');
+                } catch (error) {
+                    const errorMessage = error.message;
+                    const position = errorMessage.match(/position (\d+)/);
+                    let detailedError = `Invalid JSON: ${errorMessage}`;
+
+                    if (position) {
+                        const pos = parseInt(position[1]);
+                        const snippet = input.substring(Math.max(0, pos - 20), pos + 20);
+                        detailedError += ` Near: "${snippet}"`;
+                    }
+
+                    showStatus(detailedError, 'error');
+                }
+            }
+
+            function minifyJSON() {
+                const input = inputJSON.value.trim();
+
+                if (!input) {
+                    showStatus('Please enter some JSON to minify', 'error');
+                    return;
+                }
+
+                try {
+                    const parsed = JSON.parse(input);
+                    const minified = JSON.stringify(parsed);
+                    outputJSONRaw.value = minified;
+
+                    // Display minified with syntax highlighting
+                    outputJSON.innerHTML = syntaxHighlight(minified);
+
+                    updateOutputCharCount(minified);
+
+                    const originalSize = input.length;
+                    const minifiedSize = minified.length;
+                    const savings = ((originalSize - minifiedSize) / originalSize * 100).toFixed(1);
+
+                    showStatus(`JSON minified! Reduced by ${savings}% (${originalSize} → ${minifiedSize} chars)`, 'success');
+                } catch (error) {
+                    showStatus(`Invalid JSON: ${error.message}`, 'error');
+                    outputJSON.innerHTML = '<span style="color: var(--error);">Invalid JSON</span>';
+                    outputJSONRaw.value = '';
+                    updateOutputCharCount('');
+                }
+            }
+
+            function copyOutput() {
+                const output = outputJSONRaw.value;
+
+                if (!output) {
+                    showStatus('Nothing to copy! Format or minify JSON first.', 'error');
+                    return;
+                }
+
+                navigator.clipboard.writeText(output).then(() => {
+                    showStatus('Copied to clipboard! 📋', 'success');
+                }).catch(err => {
+                    showStatus('Failed to copy. Please try again.', 'error');
+                });
+            }
+
+            function clearAll() {
+                inputJSON.value = '';
+                outputJSON.innerHTML = 'Formatted JSON will appear here...';
+                outputJSONRaw.value = '';
+                updateCharCount(inputJSON, inputCount);
+                updateOutputCharCount('');
+                document.getElementById('statusMessage').innerHTML = '';
+                showStatus('All cleared! Ready for new JSON.', 'success');
+            }
+
+            function setIndent(spaces) {
+                currentIndent = spaces;
+
+                // Update active state
+                document.querySelectorAll('.indent-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                event.target.classList.add('active');
+
+                // Reformat if there's output
+                if (outputJSONRaw.value) {
+                    formatJSON();
+                }
+            }
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                // Ctrl/Cmd + Enter to format
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    formatJSON();
+                }
+
+                // Ctrl/Cmd + M to minify
+                if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
+                    e.preventDefault();
+                    minifyJSON();
+                }
+
+                // Ctrl/Cmd + K to clear
+                if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                    e.preventDefault();
+                    clearAll();
+                }
+            });
+
+            // Expand all arrays and objects
+            function expandAll() {
+                const allToggles = outputJSON.querySelectorAll('.json-toggle');
+                allToggles.forEach(toggle => {
+                    const id = toggle.id.replace('toggle_', '');
+                    const content = document.getElementById('content_' + id);
+                    const ellipsis = document.getElementById('ellipsis_' + id);
+                    const bracket = document.getElementById('bracket_' + id);
+
+                    if (content && content.style.display === 'none') {
+                        content.style.display = 'inline';
+                        toggle.textContent = '−';
+                        toggle.classList.remove('collapsed');
+                        if (ellipsis) ellipsis.style.display = 'none';
+                        if (bracket) bracket.style.display = 'inline';
+                    }
+                });
+                showStatus('All arrays and objects expanded! 📂', 'success');
+            }
+
+            // Collapse all arrays and objects
+            function collapseAll() {
+                const allToggles = outputJSON.querySelectorAll('.json-toggle');
+                allToggles.forEach(toggle => {
+                    const id = toggle.id.replace('toggle_', '');
+                    const content = document.getElementById('content_' + id);
+                    const ellipsis = document.getElementById('ellipsis_' + id);
+                    const bracket = document.getElementById('bracket_' + id);
+
+                    if (content && content.style.display !== 'none') {
+                        content.style.display = 'none';
+                        toggle.textContent = '+';
+                        toggle.classList.add('collapsed');
+                        if (ellipsis) ellipsis.style.display = 'inline';
+                        if (bracket) bracket.style.display = 'none';
+                    }
+                });
+                showStatus('All arrays and objects collapsed! 📁', 'success');
+            }
+
+            // Auto-format on paste
+            inputJSON.addEventListener('paste', (e) => {
+                setTimeout(() => {
+                    const input = inputJSON.value.trim();
+                    try {
+                        JSON.parse(input);
+                        setTimeout(formatJSON, 100);
+                    } catch (error) {
+                        // Invalid JSON, do nothing
+                    }
+                }, 10);
+            });
+        </script>
+</body>
+
+</html>
